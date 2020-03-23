@@ -36,7 +36,24 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "2.7.3" },
                 new object[] { "2.8.1" },
                 new object[] { "2.9.3" },
-                new object[] { "2.10.0" },
+                new object[] { "2.10.2" },
+#endif
+            };
+
+        public static IEnumerable<object[]> ElasticSearch7 =>
+
+            new List<object[]>
+            {
+#if DEFAULT_SAMPLES
+                new object[] { string.Empty },
+#else
+                new object[] { "7.0.1" },
+                new object[] { "7.1.0" },
+                new object[] { "7.2.1" },
+                new object[] { "7.3.1" },
+                new object[] { "7.4.2" },
+                new object[] { "7.5.1" },
+                new object[] { "7.6.1" },
 #endif
             };
 
@@ -55,7 +72,7 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "6.5.1" },
                 new object[] { "6.6.0" },
                 new object[] { "6.7.0" },
-                new object[] { "6.8.3" },
+                new object[] { "6.8.5" },
 #endif
             };
 
@@ -81,7 +98,7 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { string.Empty },
 #else
                 new object[] { "4.0.10" },
-                new object[] { "4.1.2" },
+                new object[] { "4.1.3.1" },
 #endif
             };
 
@@ -95,10 +112,10 @@ namespace Datadog.Trace.ClrProfiler.IntegrationTests
                 new object[] { "4.1.0" },
                 new object[] { "4.3.1" },
                 new object[] { "4.4.3" },
-                new object[] { "4.5.1" },
+                new object[] { "4.5.3" },
                 new object[] { "4.6.1" },
                 new object[] { "4.7.0" },
-                new object[] { "4.8.0" },
+                new object[] { "4.8.1" },
 #endif
             };
 

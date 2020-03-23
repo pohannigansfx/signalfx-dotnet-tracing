@@ -18,6 +18,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         public const string ElasticsearchActionKey = "elasticsearch.action";
         public const string ElasticsearchMethodKey = "elasticsearch.method";
         public const string ElasticsearchUrlKey = "elasticsearch.url";
+        public const string ElasticsearchPathKey = "elasticsearch.path";
 
         public static readonly Type CancellationTokenType = typeof(CancellationToken);
         public static readonly Type RequestPipelineType = Type.GetType("Elasticsearch.Net.IRequestPipeline, Elasticsearch.Net");
@@ -72,16 +73,47 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             return scope;
         }
 
-        public static bool AttemptWrittenBytes(Span span, object requestData, out object postData, out object writtenBytes)
+        public static Scope CreateRequestScope(Tracer tracer, string integrationName, object httpMethod, object path, object requestParameters)
         {
-            postData = null;
-            writtenBytes = null;
-            if (span == null)
+            if (!tracer.Settings.IsIntegrationEnabled(integrationName))
             {
-                return false;
+                // integration disabled, don't create a scope, skip this trace
+                return null;
             }
 
-            if (!Tracer.Instance.Settings.TagElasticsearchQueries)
+            string requestName = requestParameters?.GetType()
+                                         .Name
+                                         .Replace("RequestParameters", string.Empty);
+
+            var serviceName = string.Join("-", tracer.DefaultServiceName, ServiceName);
+
+            Scope scope = null;
+
+            try
+            {
+                var operationName = requestName ?? OperationName;
+                scope = tracer.StartActive(operationName, serviceName: serviceName);
+                var span = scope.Span;
+                span.SetTag(Tags.InstrumentationName, ComponentValue);
+                span.SetTag(Tags.SpanKind, SpanKinds.Client);
+                span.SetTag(ElasticsearchMethodKey, httpMethod.ToString());
+                span.SetTag(ElasticsearchPathKey, path.ToString());
+
+                // set analytics sample rate if enabled
+                var analyticsSampleRate = tracer.Settings.GetIntegrationAnalyticsSampleRate(integrationName, enabledWithGlobalSetting: false);
+                span.SetMetric(Tags.Analytics, analyticsSampleRate);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error creating or populating scope.");
+            }
+
+            return scope;
+        }
+
+        public static bool ShouldTagStatement(Span span)
+        {
+            if (span == null || !Tracer.Instance.Settings.TagElasticsearchQueries)
             {
                 return false;
             }
@@ -94,6 +126,24 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 return false;
             }
 
+            return true;
+        }
+
+        public static object GetWrittenBytes(object postData)
+        {
+            return postData?.GetProperty("WrittenBytes").GetValueOrDefault();
+        }
+
+        public static bool AttemptWrittenBytes(Span span, object requestData, out object postData, out object writtenBytes)
+        {
+            postData = null;
+            writtenBytes = null;
+
+            if (!ShouldTagStatement(span))
+            {
+                return false;
+            }
+
             postData = requestData.GetProperty("PostData")
                                   .GetValueOrDefault();
             if (postData == null)
@@ -101,13 +151,18 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 return false;
             }
 
-            writtenBytes = postData.GetProperty("WrittenBytes").GetValueOrDefault();
+            writtenBytes = GetWrittenBytes(postData);
             return true;
         }
 
-        public static MethodInfo GetWriteMethodInfo(string methodName, object requestData, object postData, out object connectionSettings)
+        public static object GetConnectionSettings(object requestDataOrTransport)
         {
-            connectionSettings = requestData.GetProperty("ConnectionSettings").GetValueOrDefault();
+            return requestDataOrTransport.GetProperty("ConnectionSettings").GetValueOrDefault() ??
+                   requestDataOrTransport.GetProperty("Settings").GetValueOrDefault();
+        }
+
+        public static MethodInfo GetWriteMethodInfo(string methodName, object postData)
+        {
             var postDataType = postData.GetType();
             return postDataType.GetMethod(methodName);
         }
@@ -130,8 +185,8 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
             if (writtenBytes == null)
             {
-                object connectionSettings;
-                var methodInfo = GetWriteMethodInfo("Write", requestData, postData, out connectionSettings);
+                object connectionSettings = GetConnectionSettings(requestData);
+                var methodInfo = GetWriteMethodInfo("Write", postData);
                 using (var stream = new MemoryStream())
                 {
                     object[] args = new object[] { stream, connectionSettings };
@@ -154,8 +209,56 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
             if (writtenBytes == null)
             {
-                object connectionSettings;
-                var methodInfo = GetWriteMethodInfo("WriteAsync", requestData, postData, out connectionSettings);
+                object connectionSettings = GetConnectionSettings(requestData);
+                var methodInfo = GetWriteMethodInfo("WriteAsync", postData);
+                using (var stream = new MemoryStream())
+                {
+                    object[] args = new object[] { stream, connectionSettings, null };
+                    await (Task)(methodInfo.Invoke(postData, args));
+                    writtenBytes = stream.ToArray();
+                }
+            }
+
+            SetDbStatement(span, writtenBytes);
+        }
+
+        public static void SetDbStatementFromPostData(this Span span, object postData, object transport)
+        {
+            if (!ShouldTagStatement(span))
+            {
+                return;
+            }
+
+            object writtenBytes = GetWrittenBytes(postData);
+
+            if (writtenBytes == null)
+            {
+                var connectionSettings = GetConnectionSettings(transport);
+                var methodInfo = GetWriteMethodInfo("Write", postData);
+                using (var stream = new MemoryStream())
+                {
+                    object[] args = new object[] { stream, connectionSettings };
+                    methodInfo.Invoke(postData, args);
+                    writtenBytes = stream.ToArray();
+                }
+            }
+
+            SetDbStatement(span, writtenBytes);
+        }
+
+        public static async Task SetDbStatementFromPostDataAsync(this Span span, object postData, object transport)
+        {
+            if (!ShouldTagStatement(span))
+            {
+                return;
+            }
+
+            object writtenBytes = GetWrittenBytes(postData);
+
+            if (writtenBytes == null)
+            {
+                var connectionSettings = GetConnectionSettings(transport);
+                var methodInfo = GetWriteMethodInfo("WriteAsync", postData);
                 using (var stream = new MemoryStream())
                 {
                     object[] args = new object[] { stream, connectionSettings, null };

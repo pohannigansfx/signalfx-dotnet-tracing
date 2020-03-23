@@ -3,6 +3,7 @@
 
 #include <corprof.h>
 #include <string>
+#include <cstdio>
 #include "corhlpr.h"
 
 #include "version.h"
@@ -513,6 +514,14 @@ HRESULT STDMETHODCALLTYPE CorProfiler::JITCompilationStarted(
     Debug("JITCompilationStarted: function_id=", function_id,
           " token=", function_token, " name=", caller.type.name, ".",
           caller.name, "()");
+
+    std::vector<WSTRING> sig;
+    const auto successfully_parsed_signature = TryParseSignatureTypes(
+        module_metadata->metadata_import, caller, sig);
+
+      for (size_t i = 0; i < sig.size(); i++) {
+        Debug("param:", sig[i]);
+      }
   }
 
   if (first_jit_compilation_app_domains.find(module_metadata->app_domain_id) ==
@@ -590,6 +599,9 @@ HRESULT STDMETHODCALLTYPE CorProfiler::JITCompilationStarted(
           method_replacement.target_method.method_name != target.name) {
         continue;
       }
+
+      Debug(method_replacement.target_method.type_name, " == ",  target.type.name, "&&",
+            method_replacement.target_method.method_name, " == ", target.name);
 
       // we add 3 parameters to every wrapper method: opcode, mdToken, and
       // module_version_id

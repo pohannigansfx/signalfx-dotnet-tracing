@@ -4,6 +4,7 @@
 #include <corhlpr.h>
 #include <unordered_map>
 #include <unordered_set>
+#include "logging.h"
 
 #include "clr_helpers.h"
 #include "com_ptr.h"
@@ -94,11 +95,13 @@ class ModuleMetadata {
   inline std::vector<MethodReplacement> GetMethodReplacementsForCaller(
       const trace::FunctionInfo& caller) {
     std::vector<MethodReplacement> enabled;
+    Debug("to match: ", caller.type.name, " ", caller.name);
     for (auto& i : integrations) {
       if ((i.replacement.caller_method.type_name.empty() ||
            i.replacement.caller_method.type_name == caller.type.name) &&
           (i.replacement.caller_method.method_name.empty() ||
            i.replacement.caller_method.method_name == caller.name)) {
+        Debug("matched replacement candidate: ", i.replacement.wrapper_method.type_name, " ", i.replacement.wrapper_method.method_name);
         enabled.push_back(i.replacement);
       }
     }

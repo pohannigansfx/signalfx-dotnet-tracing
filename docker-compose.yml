@@ -1,3 +1,4 @@
+# Modified by SignalFx
 version: '3'
 services:
   servicestackredis:
@@ -17,6 +18,14 @@ services:
     ports:
       - "127.0.0.1:27017:27017"
     command: mongod
+
+  elasticsearch7:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+    ports:
+    - "127.0.0.1:9207:9200"
+    - "127.0.0.1:9307:9300"
+    environment:
+    - discovery.type=single-node
 
   elasticsearch6:
     image: docker.elastic.co/elasticsearch/elasticsearch:6.4.2
@@ -172,6 +181,19 @@ services:
     depends_on:
     - elasticsearch5
 
+  Samples.Elasticsearch.V7:
+    build:
+      context: ./
+      dockerfile: ./docker/dotnet.dockerfile
+    image: datadog-dotnet
+    command: bash -c "/project/docker/with-profiler-logs.bash wait-for-it elasticsearch7:9200 -- /project/docker/with-profiler.bash dotnet /project/samples/Samples.Elasticsearch.V7/bin/${buildConfiguration}/${publishTargetFramework}/publish/Samples.Elasticsearch.V7.dll"
+    volumes:
+    - ./:/project
+    environment:
+    - ELASTICSEARCH7_HOST=elasticsearch7:9200
+    depends_on:
+    - elasticsearch7
+
   Samples.SqlServer:
     build:
       context: ./
@@ -238,6 +260,7 @@ services:
     - MONGO_HOST=mongo
     - SERVICESTACK_REDIS_HOST=servicestackredis:6379
     - STACKEXCHANGE_REDIS_HOST=stackexchangeredis:6379
+    - ELASTICSEARCH7_HOST=elasticsearch7:9200
     - ELASTICSEARCH6_HOST=elasticsearch6:9200
     - ELASTICSEARCH5_HOST=elasticsearch5:9200
     - SQLSERVER_CONNECTION_STRING=Server=sqlserver;User=sa;Password=Strong!Passw0rd
@@ -249,6 +272,7 @@ services:
     depends_on:
     - servicestackredis
     - stackexchangeredis
+    - elasticsearch7
     - elasticsearch6
     - elasticsearch5
     - sqlserver
@@ -268,6 +292,7 @@ services:
     - MONGO_HOST=mongo
     - SERVICESTACK_REDIS_HOST=servicestackredis:6379
     - STACKEXCHANGE_REDIS_HOST=stackexchangeredis:6379
+    - ELASTICSEARCH7_HOST=elasticsearch7:9200
     - ELASTICSEARCH6_HOST=elasticsearch6:9200
     - ELASTICSEARCH5_HOST=elasticsearch5:9200
     - SQLSERVER_CONNECTION_STRING=Server=sqlserver;User=sa;Password=Strong!Passw0rd
@@ -279,6 +304,7 @@ services:
     depends_on:
     - servicestackredis
     - stackexchangeredis
+    - elasticsearch7
     - elasticsearch6
     - elasticsearch5
     - sqlserver
@@ -298,6 +324,7 @@ services:
     - MONGO_HOST=mongo
     - SERVICESTACK_REDIS_HOST=servicestackredis:6379
     - STACKEXCHANGE_REDIS_HOST=stackexchangeredis:6379
+    - ELASTICSEARCH7_HOST=elasticsearch7:9200
     - ELASTICSEARCH6_HOST=elasticsearch6:9200
     - ELASTICSEARCH5_HOST=elasticsearch5:9200
     - SQLSERVER_CONNECTION_STRING=Server=sqlserver;User=sa;Password=Strong!Passw0rd
@@ -309,6 +336,7 @@ services:
     depends_on:
     - servicestackredis
     - stackexchangeredis
+    - elasticsearch7
     - elasticsearch6
     - elasticsearch5
     - sqlserver
@@ -328,6 +356,7 @@ services:
     - MONGO_HOST=mongo
     - SERVICESTACK_REDIS_HOST=servicestackredis:6379
     - STACKEXCHANGE_REDIS_HOST=stackexchangeredis:6379
+    - ELASTICSEARCH7_HOST=elasticsearch7:9200
     - ELASTICSEARCH6_HOST=elasticsearch6:9200
     - ELASTICSEARCH5_HOST=elasticsearch5:9200
     - SQLSERVER_CONNECTION_STRING=Server=sqlserver;User=sa;Password=Strong!Passw0rd
@@ -339,6 +368,7 @@ services:
     depends_on:
     - servicestackredis
     - stackexchangeredis
+    - elasticsearch7
     - elasticsearch6
     - elasticsearch5
     - sqlserver
